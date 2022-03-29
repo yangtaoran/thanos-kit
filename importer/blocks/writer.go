@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/tsdb"
 	"github.com/thanos-io/thanos/pkg/block/metadata"
@@ -31,7 +31,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/pkg/timestamp"
+	"github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/tsdb/chunkenc"
 )
 
@@ -93,8 +93,10 @@ func (w *TSDBWriter) initHead() error {
 		return errors.Wrap(err, "create temp dir")
 	}
 	w.tmpDir = tmpDir
-
-	h, err := tsdb.NewHead(nil, logger, nil, DurToMillis(9999*time.Hour), w.tmpDir, nil, tsdb.DefaultStripeSize, nil)
+	opts := tsdb.DefaultHeadOptions()
+	opts.ChunkRange = DurToMillis(9999 * time.Hour)
+	opts.ChunkDirRoot = w.tmpDir
+	h, err := tsdb.NewHead(nil, logger, nil, opts, tsdb.NewHeadStats())
 	if err != nil {
 		return errors.Wrap(err, "tsdb.NewHead")
 	}
@@ -104,8 +106,8 @@ func (w *TSDBWriter) initHead() error {
 }
 
 // Appender is not thread-safe. Returned Appender is thread-save however.
-func (w *TSDBWriter) Appender() storage.Appender {
-	return w.head.Appender()
+func (w *TSDBWriter) Appender(ctx context.Context) storage.Appender {
+	return w.head.Appender(ctx)
 }
 
 // Flush implements Writer interface. This is where actual block writing
@@ -126,7 +128,8 @@ func (w *TSDBWriter) Flush() ([]ulid.ULID, error) {
 		nil,
 		w.logger,
 		[]int64{DurToMillis(2 * time.Hour)}, // Does not matter, used only for planning.
-		chunkenc.NewPool())
+		chunkenc.NewPool(),
+		nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "create leveled compactor")
 	}
@@ -137,14 +140,13 @@ func (w *TSDBWriter) Flush() ([]ulid.ULID, error) {
 	// TODO(bwplotka): Potential truncate head, and allow writer reuse. Currently truncating fails with
 	// truncate chunks.HeadReadWriter: maxt of the files are not set.
 
-	meta, err := metadata.Read(filepath.Join(w.dir, id.String()))
+	meta, err := metadata.ReadFromDir(filepath.Join(w.dir, id.String()))
 	if err != nil {
 		return nil, errors.Wrap(err, "metadata read")
 	}
 	meta.Thanos.Source = "thanos-kit"
 	meta.Thanos.Labels = w.labels.Map()
-	err = metadata.Write(w.logger, filepath.Join(w.dir, id.String()), meta)
-	if err != nil {
+	if err = meta.WriteToDir(w.logger, filepath.Join(w.dir, id.String())); err != nil {
 		return nil, errors.Wrap(err, "metadata write")
 	}
 	return []ulid.ULID{id}, nil

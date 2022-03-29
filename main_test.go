@@ -41,7 +41,7 @@ func Test_e2e(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 	localStore := []byte(fmt.Sprintf(`{type: FILESYSTEM, config: {directory: %s}}`, bktDir))
-	blockSize := 2*time.Hour
+	blockSize := 2 * time.Hour
 	importLabels := []string{
 		`prometheus="prometheus-a"`,
 		"datacenter=us",
@@ -58,7 +58,7 @@ func Test_e2e(t *testing.T) {
 			continue
 		}
 		ids = append(ids, d.Name())
-		meta, err := metadata.Read(filepath.Join(bktDir, d.Name()))
+		meta, err := metadata.ReadFromDir(filepath.Join(bktDir, d.Name()))
 		if err != nil {
 			t.Errorf("fail to read meta.json for %s: %v", d.Name(), err)
 		}

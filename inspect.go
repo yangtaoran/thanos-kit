@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/thanos-io/thanos/pkg/block"
 	"github.com/thanos-io/thanos/pkg/block/metadata"
 	"github.com/thanos-io/thanos/pkg/extprom"
@@ -40,7 +40,7 @@ func inspect(objStoreConfig []byte, selector *[]string, sortBy []string, logger 
 		return err
 	}
 
-	fetcher, err := block.NewMetaFetcher(logger, 32, bkt, "", extprom.WrapRegistererWithPrefix(extpromPrefix, metrics), nil, nil)
+	fetcher, err := block.NewMetaFetcher(logger, 32, bkt, "", extprom.WrapRegistererWithPrefix(extpromPrefix, metrics), nil)
 	if err != nil {
 		return err
 	}

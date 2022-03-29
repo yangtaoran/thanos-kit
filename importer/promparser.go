@@ -18,7 +18,7 @@ import (
 	"bufio"
 	"io"
 
-	"github.com/prometheus/prometheus/pkg/textparse"
+	"github.com/prometheus/prometheus/model/textparse"
 )
 
 type Parser struct {

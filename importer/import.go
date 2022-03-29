@@ -15,18 +15,19 @@
 package importer
 
 import (
+	"context"
 	"fmt"
+	"github.com/prometheus/prometheus/storage"
 	"io"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/pkg/textparse"
+	"github.com/prometheus/prometheus/model/labels"
+	"github.com/prometheus/prometheus/model/textparse"
 	tsdb_errors "github.com/prometheus/prometheus/tsdb/errors"
-
-	"github.com/sepich/thanos-kit/importer/blocks"
+	"github.com/yangtaoran/thanos-kit/importer/blocks"
 )
 
 // Import imports data from a textparse Parser into block Writer.
@@ -39,16 +40,19 @@ func Import(logger log.Logger, p textparse.Parser, w blocks.Writer) (ids []ulid.
 	}
 
 	level.Info(logger).Log("msg", "started importing input data.")
-	app := w.Appender()
+	app := w.Appender(context.Background())
 
 	defer func() {
-		var merr tsdb_errors.MultiError
+		merr := tsdb_errors.NewMulti()
 		merr.Add(err)
 		merr.Add(w.Close())
 		err = merr.Err()
 	}()
 
-	var e textparse.Entry
+	var (
+		e   textparse.Entry
+		ref storage.SeriesRef
+	)
 	for {
 		e, err = p.Next()
 		if err == io.EOF {
@@ -70,7 +74,7 @@ func Import(logger log.Logger, p textparse.Parser, w blocks.Writer) (ids []ulid.
 		if ts == nil {
 			return nil, errors.Errorf("expected timestamp for series %v, got none", l.String())
 		}
-		if _, err := app.Add(l, *ts, v); err != nil {
+		if ref, err = app.Append(ref, l, *ts, v); err != nil {
 			return nil, errors.Wrap(err, "add sample")
 		}
 	}

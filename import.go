@@ -13,18 +13,22 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/thanos-io/thanos/pkg/block"
+	"github.com/thanos-io/thanos/pkg/block/metadata"
 	"github.com/thanos-io/thanos/pkg/objstore/client"
 	"github.com/thanos-io/thanos/pkg/runutil"
-
-	"github.com/sepich/thanos-kit/importer"
-	"github.com/sepich/thanos-kit/importer/blocks"
+	"github.com/yangtaoran/thanos-kit/importer"
+	"github.com/yangtaoran/thanos-kit/importer/blocks"
 )
 
-func backfill(objStoreConfig []byte, importFromFile *string, importBlockSize *time.Duration, importDataDir *string, importLabels *[]string, logger log.Logger, metrics *prometheus.Registry) (err error) {
-
-
-	err = wipeDir(*importDataDir, logger)
-	if err != nil {
+func backfill(
+	objStoreConfig []byte,
+	importFromFile *string,
+	importBlockSize *time.Duration,
+	importDataDir *string,
+	importLabels *[]string,
+	logger log.Logger,
+	metrics *prometheus.Registry) (err error) {
+	if err = wipeDir(*importDataDir, logger); err != nil {
 		return errors.Wrapf(err, "cleanup dir %s", *importDataDir)
 	}
 
@@ -65,7 +69,7 @@ func backfill(objStoreConfig []byte, importFromFile *string, importBlockSize *ti
 	for _, id := range ids {
 		bdir := filepath.Join(*importDataDir, id.String())
 		begin := time.Now()
-		err = block.Upload(context.TODO(), logger, bkt, bdir)
+		err = block.Upload(context.TODO(), logger, bkt, bdir, metadata.NoneFunc)
 		if err != nil {
 			return errors.Wrapf(err, "upload block %s", id.String())
 		}

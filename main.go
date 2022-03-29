@@ -8,11 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/efficientgo/tools/extkingpin"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/common/version"
-	"github.com/thanos-io/thanos/pkg/extflag"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -66,7 +67,7 @@ func main() {
 	metrics := prometheus.NewRegistry()
 	metrics.MustRegister(
 		version.NewCollector("thanos"),
-		prometheus.NewGoCollector(),
+		collectors.NewGoCollector(),
 	)
 	objStoreYaml, err := objStoreConfig.Content()
 	if err != nil {
@@ -85,11 +86,10 @@ func main() {
 	}
 }
 
-func regCommonObjStoreFlags(cmd *kingpin.Application, suffix string, required bool, extraDesc ...string) *extflag.PathOrContent {
+func regCommonObjStoreFlags(cmd *kingpin.Application, suffix string, required bool, extraDesc ...string) *extkingpin.PathOrContent {
 	help := fmt.Sprintf("YAML file that contains object store%s configuration. See format details: https://thanos.io/storage.md/#configuration ", suffix)
 	help = strings.Join(append([]string{help}, extraDesc...), " ")
-
-	return extflag.RegisterPathOrContent(cmd, fmt.Sprintf("objstore%s.config", suffix), help, required)
+	return extkingpin.RegisterPathOrContent(cmd, fmt.Sprintf("objstore%s.config", suffix), help)
 }
 
 func checkErr(err error) int {

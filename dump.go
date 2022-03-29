@@ -13,7 +13,7 @@ import (
 	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/tsdb"
 	tsdb_errors "github.com/prometheus/prometheus/tsdb/errors"
 	"github.com/thanos-io/thanos/pkg/block"
@@ -80,7 +80,7 @@ func dumpSamples(path string, mint, maxt int64, out io.Writer, logger log.Logger
 		it := series.Iterator()
 		for it.Next() {
 			ts, val := it.At()
-			fmt.Fprintf(out,"%s%s %g %d\n", nm, lbs, val, ts)
+			fmt.Fprintf(out, "%s%s %g %d\n", nm, lbs, val, ts)
 		}
 		if it.Err() != nil {
 			return ss.Err()
@@ -88,7 +88,7 @@ func dumpSamples(path string, mint, maxt int64, out io.Writer, logger log.Logger
 	}
 
 	if ws := ss.Warnings(); len(ws) > 0 {
-		var merr tsdb_errors.MultiError
+		merr := tsdb_errors.NewMulti()
 		for _, w := range ws {
 			merr.Add(w)
 		}

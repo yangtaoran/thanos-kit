@@ -14,7 +14,7 @@ import (
 	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/tsdb"
 	"github.com/prometheus/prometheus/tsdb/chunks"
 	tsdb_errors "github.com/prometheus/prometheus/tsdb/errors"
@@ -24,7 +24,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/runutil"
 )
 
-var merr tsdb_errors.MultiError
+var merr = tsdb_errors.NewMulti()
 
 func analyze(objStoreConfig []byte, id *string, dir *string, limit *int, logger log.Logger, metrics *prometheus.Registry) error {
 	bkt, err := client.NewBucket(logger, objStoreConfig, metrics, "bucket")
@@ -65,7 +65,7 @@ func analyzeBlock(path, blockID string, limit int) error {
 
 	meta := block.Meta()
 	fmt.Printf("Block ID: %s\n", meta.ULID)
-	m, err := metadata.Read(filepath.Join(path, blockID))
+	m, err := metadata.ReadFromDir(filepath.Join(path, blockID))
 	if err != nil {
 		return errors.Wrapf(err, "fail to read meta.json for %s", blockID)
 	}

@@ -15,10 +15,13 @@
 package blocks
 
 import (
+	"context"
+
 	"github.com/go-kit/kit/log"
 	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/exemplar"
+	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/storage"
 	tsdb_errors "github.com/prometheus/prometheus/tsdb/errors"
 	"github.com/prometheus/prometheus/tsdb/index"
@@ -26,10 +29,21 @@ import (
 
 type errAppender struct{ err error }
 
-func (a errAppender) Add(l labels.Labels, t int64, v float64) (uint64, error) { return 0, a.err }
-func (a errAppender) AddFast(ref uint64, t int64, v float64) error            { return a.err }
-func (a errAppender) Commit() error                                           { return a.err }
-func (a errAppender) Rollback() error                                         { return a.err }
+func (a errAppender) AppendExemplar(ref storage.SeriesRef, l labels.Labels, e exemplar.Exemplar) (storage.SeriesRef, error) {
+	return 0, a.err
+}
+
+func (a errAppender) Append(ref storage.SeriesRef, l labels.Labels, t int64, v float64) (storage.SeriesRef, error) {
+	return 0, a.err
+}
+
+func (a errAppender) Commit() error {
+	return a.err
+}
+
+func (a errAppender) Rollback() error {
+	return a.err
+}
 
 func rangeForTimestamp(t int64, width int64) (maxt int64) {
 	return (t/width)*width + width
@@ -59,7 +73,9 @@ func NewMultiWriter(logger log.Logger, dir string, sizeMillis int64, lbls labels
 
 // Appender is not thread-safe. Returned Appender is not thread-save as well.
 // TODO(bwplotka): Consider making it thread safe.
-func (w *MultiWriter) Appender() storage.Appender { return w }
+func (w *MultiWriter) Appender(ctx context.Context) storage.Appender {
+	return w
+}
 
 func (w *MultiWriter) getOrCreate(t int64) storage.Appender {
 	maxt := rangeForTimestamp(t, w.sizeMillis)
@@ -74,20 +90,20 @@ func (w *MultiWriter) getOrCreate(t int64) storage.Appender {
 	}
 
 	w.blocks[hash] = nw
-	w.activeAppenders[hash] = nw.Appender()
+	w.activeAppenders[hash] = nw.Appender(context.Background())
 	return w.activeAppenders[hash]
 }
 
-func (w *MultiWriter) Add(l labels.Labels, t int64, v float64) (uint64, error) {
-	return w.getOrCreate(t).Add(l, t, v)
+func (w *MultiWriter) AppendExemplar(ref storage.SeriesRef, l labels.Labels, e exemplar.Exemplar) (storage.SeriesRef, error) {
+	return w.getOrCreate(e.Ts).AppendExemplar(ref, l, e)
 }
 
-func (w *MultiWriter) AddFast(ref uint64, t int64, v float64) error {
-	return w.getOrCreate(t).AddFast(ref, t, v)
+func (w *MultiWriter) Append(ref storage.SeriesRef, l labels.Labels, t int64, v float64) (storage.SeriesRef, error) {
+	return w.getOrCreate(t).Append(ref, l, t, v)
 }
 
 func (w *MultiWriter) Commit() error {
-	var merr tsdb_errors.MultiError
+	merr := tsdb_errors.NewMulti()
 	for _, a := range w.activeAppenders {
 		merr.Add(a.Commit())
 	}
@@ -95,7 +111,7 @@ func (w *MultiWriter) Commit() error {
 }
 
 func (w *MultiWriter) Rollback() error {
-	var merr tsdb_errors.MultiError
+	merr := tsdb_errors.NewMulti()
 	for _, a := range w.activeAppenders {
 		merr.Add(a.Rollback())
 	}
@@ -115,7 +131,7 @@ func (w *MultiWriter) Flush() ([]ulid.ULID, error) {
 }
 
 func (w *MultiWriter) Close() error {
-	var merr tsdb_errors.MultiError
+	merr := tsdb_errors.NewMulti()
 	for _, b := range w.blocks {
 		merr.Add(b.Close())
 	}
