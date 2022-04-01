@@ -17,7 +17,6 @@ package importer
 import (
 	"context"
 	"fmt"
-	"github.com/prometheus/prometheus/storage"
 	"io"
 
 	"github.com/go-kit/kit/log"
@@ -49,10 +48,7 @@ func Import(logger log.Logger, p textparse.Parser, w blocks.Writer) (ids []ulid.
 		err = merr.Err()
 	}()
 
-	var (
-		e   textparse.Entry
-		ref storage.SeriesRef
-	)
+	var e textparse.Entry
 	for {
 		e, err = p.Next()
 		if err == io.EOF {
@@ -74,7 +70,7 @@ func Import(logger log.Logger, p textparse.Parser, w blocks.Writer) (ids []ulid.
 		if ts == nil {
 			return nil, errors.Errorf("expected timestamp for series %v, got none", l.String())
 		}
-		if ref, err = app.Append(ref, l, *ts, v); err != nil {
+		if _, err = app.Append(0, l, *ts, v); err != nil {
 			return nil, errors.Wrap(err, "add sample")
 		}
 	}
